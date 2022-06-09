@@ -5,7 +5,7 @@
  * @param children 子节点
  * @returns
  */
-export function createElement(type, props, ...children) {
+function createElement(type, props, ...children) {
   return {
     type,
     props: {
@@ -37,13 +37,14 @@ function createTextElement(child: string) {
  * @param element
  * @param container
  */
-export function render(element, container) {
-  nextUnitOfWork = {
+function render(element, container) {
+  wipRoot = {
     dom: container,
     props: {
       children: [element],
     },
   };
+  nextUnitOfWork = wipRoot;
 }
 
 /**
@@ -68,6 +69,7 @@ function createDom(fiber) {
 }
 
 let nextUnitOfWork: any = null; // 下一个工作单元
+let wipRoot: any = null; // wip 即 workInProgress（当前进行中的工作）
 
 type RequestIdleCallbackDeadline = {
   timeRemaining: () => number; // 当前帧的剩余时间
@@ -84,6 +86,11 @@ function workLoop(deadline: RequestIdleCallbackDeadline) {
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork); // 不断处理
     shouldYield = deadline.timeRemaining() < 1; // 剩余时间不足 1ms，则放在下一帧中处理
   }
+
+  // 工作单元处理结束后，进入 commit 阶段（构建 DOM 树）
+  if (!nextUnitOfWork && wipRoot) {
+    commitRoot();
+  }
 }
 
 requestIdleCallback(workLoop); // 一旦浏览器有空闲时间，就去处理任务
@@ -94,14 +101,10 @@ requestIdleCallback(workLoop); // 一旦浏览器有空闲时间，就去处理�
  * @returns
  */
 function performUnitOfWork(fiber) {
-  // createElement 和 appendChild 放在顶部执行的原因，当前参数 fiber 是未被处理过的（没有对应的 DOM）
+  // createElement 放在顶部执行的原因，当前参数 fiber 是未被处理过的（没有对应的 DOM）
   // 创建 fiber 对应的 dom 节点
   if (!fiber.dom) {
     fiber.dom = createDom(fiber);
-  }
-  // 当前处理的工作单元（当前的 fiber），将 fiebr 的 dom 挂载到父节点里
-  if (fiber.parent) {
-    fiber.parent.dom.appendChild(fiber.dom);
   }
 
   const elements = fiber.props.children;
@@ -147,9 +150,28 @@ function performUnitOfWork(fiber) {
   }
 }
 
-const React = {
+function commitRoot() {
+  commitWork(wipRoot.child);
+  wipRoot = null;
+}
+
+/**
+ * 根据 fiber 的链表，构建 DOM 树
+ * @param fiber
+ * @returns
+ */
+function commitWork(fiber) {
+  if (!fiber) {
+    return;
+  }
+  const domParent = fiber.parent.dom;
+  domParent.appendChild(fiber.dom);
+
+  commitWork(fiber.child); // 不断向下处理子节点
+  commitWork(fiber.sibling); // 不断向后去挂载兄弟节点
+}
+
+export default {
   createElement,
   render,
 };
-
-export default React;

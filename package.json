@@ -5,7 +5,6 @@
   "module": "lib/mini-react.esm.js",
   "license": "MIT",
   "scripts": {
-    "test": "jest",
     "build": "rollup -c rollup.config.js",
     "serve": "webpack-dev-server --config ./example/webpack.config --progress"
   },
