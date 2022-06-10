@@ -174,15 +174,13 @@ requestIdleCallback(workLoop); // 一旦浏览器有空闲时间，就去处理�
  * @returns
  */
 function performUnitOfWork(fiber) {
-  // createElement 放在顶部执行的原因，当前参数 fiber 是未被处理过的（没有对应的 DOM）
-  // 创建 fiber 对应的 dom 节点
-  if (!fiber.dom) {
-    fiber.dom = createDom(fiber);
+  // 判断是否函数组件
+  const isFunctionComponent = fiber.type instanceof Function;
+  if (isFunctionComponent) {
+    updateFunctionComponent(fiber);
+  } else {
+    updateHostComponent(fiber);
   }
-
-  const elements = fiber.props.children;
-  reconcileChildren(fiber, elements);
-
   // fiber 处理方式是深度优先后序遍历
   // 如果有子节点则优先处理子节点
   if (fiber.child) {
@@ -197,6 +195,20 @@ function performUnitOfWork(fiber) {
     // 如果兄弟节点处理完毕，则处理父节点的兄弟节点
     nextFiber = nextFiber.parent;
   }
+}
+
+function updateFunctionComponent(fiber) {
+  const children = [fiber.type(fiber.props)];
+  reconcileChildren(fiber, children);
+}
+
+function updateHostComponent(fiber) {
+  // 创建 fiber 对应的 dom 节点
+  if (!fiber.dom) {
+    fiber.dom = createDom(fiber);
+  }
+  const elements = fiber.props.children || [];
+  reconcileChildren(fiber, elements);
 }
 
 /**
@@ -280,17 +292,32 @@ function commitWork(fiber) {
   if (!fiber) {
     return;
   }
-  const domParent = fiber.parent.dom;
+  // 针对函数组件
+  let domParentFiber = fiber.parent;
+  debugger;
+  while (!domParentFiber.dom) {
+    domParentFiber = domParentFiber.parent;
+  }
+  const domParent = domParentFiber.dom;
+
   // 新增逻辑
   if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
     domParent.appendChild(fiber.dom);
   } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
     updateDom(fiber.dom, fiber.alternate.props, fiber.props);
   } else if (fiber.effectTag === "DELETE") {
-    domParent.removeChild(fiber.dom);
+    commitDeletion(fiber.dom, domParent);
   }
   commitWork(fiber.child); // 不断向下处理子节点
   commitWork(fiber.sibling); // 不断向后去挂载兄弟节点
+}
+function commitDeletion(fiber, domParent) {
+  // 函数组件，在删除节点时需要不断向下查找
+  if (fiber.dom) {
+    domParent.removeChild(fiber.dom);
+  } else {
+    commitDeletion(fiber.child, domParent);
+  }
 }
 
 export default {
