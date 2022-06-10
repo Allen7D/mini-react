@@ -1,9 +1,13 @@
 import React from "react"; // 将mini-react 作为 React 来时用
 
+function handleClick() {
+  console.log("click");
+}
 const element = (
   <div style="font-size: 12px;" title="build">
     <div style="color: red;">Hello World</div>
     <div style="color: blue;">mini-react</div>
+    <button onClick={handleClick}>点击</button>
   </div>
 );
 
