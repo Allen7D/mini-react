@@ -1,5 +1,5 @@
 # Mini React
-本项目基于 React16.8，从零开始逐步构建一个涵盖 React 核心逻辑的微模型，遵循真实的 React 代码结构，但不会包含所有的优化以及非必要的功能，以此来深入学习理解 React 源码。
+本项目基于 React 16.8，从零开始逐步构建一个涵盖 React 核心逻辑的微模型，遵循真实的 React 代码结构，但不会包含所有的优化以及非必要的功能，以此来深入学习理解 React 源码。
 
 ```bash
 # 安装依赖
@@ -10,13 +10,13 @@ yarn build
 yarn serve
 ```
 ## 项目初始化
-本项目中，使用 rollup 作为库的打包工具来处理 mini-react，使用 webpack 作为网页应用的大包工具处理业务逻辑。
+本项目中，使用 rollup 作为库的打包工具来处理 mini-react，使用 webpack 作为网页应用的打包工具处理业务逻辑。
 
 rollup 将 packages 中 mini-react 的核心逻辑编译打包到 lib 中，并支持 commonjs 规范和 esm 规范。
 
 webpack 将 `./lib/mini-react.esm.js` 路径别名（alias）成 React，并将 `./example/index.jsx` 代码编译成 js 放在 `index.html` 中运行。
 
-在 `index.jsx` 中，JSX 的解析转换处理是由 `babel/preset-react` 处理，webpack 会使项目中自定义的 `createElement` 方法将 JSX 解析结果(type、props、children 三个参数)转为成 vdom（虚拟DOM）。
+在 `index.jsx` 中，JSX 的解析转换处理是由 `babel/preset-react` 处理，webpack 会将 JSX 解析后的结果(type、props、children 三个参数)经过项目中自定义的 `createElement` 方法转为成 vdom（虚拟DOM）。
 
 我们会在 `packages` 文件夹中编写 mini-react 的核心逻辑，在 `./example/index.jsx` 中使用 mini-react 来验证其功能。
 ```

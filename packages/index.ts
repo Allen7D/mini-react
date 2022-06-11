@@ -17,6 +17,7 @@ interface Fiber extends ReactElement {
   child?: Fiber | null; // 第一个子 Fiber
   alternate: Fiber | null; // 指向旧的 fiber
   effectTag: FiberEffectTag; // fiebr 的状态（增、删、改）
+  hooks?: Array<any>;
 }
 
 /**
@@ -64,6 +65,7 @@ function render(element, container) {
     props: {
       children: [element],
     },
+    alternate: currentRoot,
   };
   deletions = [];
   nextUnitOfWork = wipRoot;
@@ -164,6 +166,8 @@ function workLoop(deadline: RequestIdleCallbackDeadline) {
   if (!nextUnitOfWork && wipRoot) {
     commitRoot();
   }
+
+  requestIdleCallback(workLoop);
 }
 
 requestIdleCallback(workLoop); // 一旦浏览器有空闲时间，就去处理任务
@@ -197,9 +201,52 @@ function performUnitOfWork(fiber) {
   }
 }
 
+let wipFiber; // 目前仅用于全局一个函数组件
+let hookIndex;
+
 function updateFunctionComponent(fiber) {
-  const children = [fiber.type(fiber.props)];
+  wipFiber = fiber;
+  hookIndex = 0;
+  wipFiber.hooks = []; // 执行函数组件前; hook 挂载在当前函数组件对应的 fiber 上
+
+  const children = [fiber.type(fiber.props)]; //  执行函数组件，此处内部会包含 useState 执行
   reconcileChildren(fiber, children);
+}
+
+export function useState(initial) {
+  const oldHook =
+    wipFiber.alternate &&
+    wipFiber.alternate.hooks &&
+    wipFiber.alternate.hooks[hookIndex];
+  const hook = {
+    state: oldHook ? oldHook.state : initial,
+    queue: [] as Function[],
+  };
+
+  const actions = oldHook ? oldHook.queue : [];
+  actions.forEach((action) => {
+    hook.state = action(hook.state);
+  });
+
+  const setState = <T>(action: T | ((prevState: T) => T)) => {
+    let act = action;
+    if (typeof action !== "function") {
+      act = () => action;
+    }
+    hook.queue.push(act as Function);
+    wipRoot = {
+      dom: currentRoot.dom,
+      props: currentRoot.props,
+      alternate: currentRoot,
+    };
+    nextUnitOfWork = wipRoot; // 让 workLoop 开始工作
+    deletions = [];
+  };
+
+  wipFiber.hooks.push(hook);
+  hookIndex++; // 基于闭包
+
+  return [hook.state, setState];
 }
 
 function updateHostComponent(fiber) {
@@ -294,7 +341,6 @@ function commitWork(fiber) {
   }
   // 针对函数组件
   let domParentFiber = fiber.parent;
-  debugger;
   while (!domParentFiber.dom) {
     domParentFiber = domParentFiber.parent;
   }
@@ -306,11 +352,12 @@ function commitWork(fiber) {
   } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
     updateDom(fiber.dom, fiber.alternate.props, fiber.props);
   } else if (fiber.effectTag === "DELETE") {
-    commitDeletion(fiber.dom, domParent);
+    commitDeletion(fiber, domParent);
   }
   commitWork(fiber.child); // 不断向下处理子节点
   commitWork(fiber.sibling); // 不断向后去挂载兄弟节点
 }
+
 function commitDeletion(fiber, domParent) {
   // 函数组件，在删除节点时需要不断向下查找
   if (fiber.dom) {
@@ -323,4 +370,5 @@ function commitDeletion(fiber, domParent) {
 export default {
   createElement,
   render,
+  useState,
 };
